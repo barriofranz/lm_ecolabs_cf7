@@ -79,6 +79,13 @@ class Lm_ecolabs_cf7 {
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
 
+		if ( class_exists( 'WPCF7_ContactForm' ) || class_exists( 'CFDB7_Wp_Main_Page' ) ) {
+			// add_action( 'admin_init', array( $this, 'init' ), 20 );
+			//
+			add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_chosen_scripts' ), 20 );
+			add_action( 'admin_menu', array( $this, 'add_menu_item' ) );
+		}
+
 	}
 
 	/**
@@ -215,4 +222,134 @@ class Lm_ecolabs_cf7 {
 		return $this->version;
 	}
 
+	public function init() {
+		// Make sure this processing runs on the right page.
+		if ( isset( $_GET['page'] ) && 'lm_ecolabs_cf7' === $_GET['page'] ) {
+
+		}
+
+	}
+
+	public function enqueue_chosen_scripts() {
+		global $current_screen;
+		global $woocommerce;
+
+
+		if ( 'contact_page_lm_ecolabs_cf7' === $current_screen->base ) {
+
+			$css = plugins_url('lm_ecolabs_cf7/public/css/lm_ecolabs_cf7-public.css');
+			wp_enqueue_style( 'lm_ecolabs_cf7_css', $css, array(), LM_ECOLABS_CF7_VERSION );
+
+			$js = plugins_url('lm_ecolabs_cf7/public/js/lm_ecolabs_cf7-public.js');
+			wp_enqueue_script( 'lm_ecolabs_cf7_js', $js, array(), LM_ECOLABS_CF7_VERSION );
+			wp_localize_script( 'lm_ecolabs_cf7_js', 'ajaxArr', array( 'ajaxDatasource' => admin_url( 'admin-ajax.php' )));
+
+			// wp_enqueue_script( 'apexcharts', 'https://www.gstatic.com/charts/loader.js', array(), LM_ECOLABS_CF7_VERSION );
+
+
+		}
+	}
+
+	public function add_menu_item() {
+		if ( is_admin() ) {
+			add_submenu_page(
+				'wpcf7',
+				__( 'Leads list', 'lm-ecolabs-cf7' ),
+				__( 'Leads list', 'lm-ecolabs-cf7' ),
+				'edit_posts',
+				'lm_ecolabs_cf7',
+				array( $this, 'display_page' ),
+			);
+		}
+		return false;
+	}
+
+	public function display_page() {
+		$formtypes = $this->getFormTypes();
+		$exporturl = admin_url( 'admin-post.php?action=leadlistprintcsv' );
+		// $shift_types = $this->getShiftTypes();
+		//
+		// $fb_sc_emailfrom = get_option( 'fb_sc_emailfrom' );
+		// $fb_sc_calendarpw = get_option( 'fb_sc_calendarpw' );
+
+		include_once __DIR__ . '/../public/lead_lists.php';
+	}
+
+	public function getFormTypes()
+	{
+		global $wpdb;
+		$sql = "
+
+		SELECT ID, post_title
+		FROM ".$wpdb->prefix."posts
+
+		WHERE post_type = 'wpcf7_contact_form'
+		and post_status = 'publish'
+
+		";
+		// echo "<pre>";print_r($sql);echo "</pre>";die();
+		return $wpdb->get_results( $sql );
+	}
+
+	public function getLeadMeta($form_meta_form_id)
+	{
+		global $wpdb;
+		$sql = "
+
+		SELECT *
+		FROM ".$wpdb->prefix."lm_ecolabs_cf7_form_meta
+
+		WHERE form_meta_form_id = '". $form_meta_form_id ."'
+
+		";
+		// echo "<pre>";print_r($sql);echo "</pre>";die();
+		return $wpdb->get_results( $sql );
+	}
+
+	public function getLeadList($count = false, $where = [], $page = false, $limit = false, $order = false)
+	{
+		global $wpdb;
+
+		$fields = $count == true ? 'COUNT(DISTINCT(form_id)) AS count' : 't1.*, t3.post_title' ;
+		$groupQ = $count == false ? 'GROUP BY form_id' : '' ;
+
+		$limitQ = '';
+		if ( $page!==false && $limit!==false ) {
+
+			$offset = $page*$limit;
+			$limitQ = "limit ".$offset.",".$limit."";
+		}
+		$orderQ = '';
+		if ( $order!==false ) {
+			$orderQ = ' order by ' . $order['col'] . ' ' . $order['dir'];
+		}
+		$whereQ = '';
+		if ( isset($where['form_post_id']) && $where['form_post_id'] != 0 ) {
+			$whereQ .= ' AND form_post_id = "'.$where['form_post_id'].'"';
+		}
+		if ( isset($where['from_date']) && $where['from_date'] !='' ) {
+			$whereQ .= ' AND form_date_created >= "'.$where['from_date'].'"';
+		}
+		if ( isset($where['to_date']) && $where['to_date'] !='' ) {
+			$whereQ .= ' AND form_date_created <= "'.$where['to_date'].'"';
+		}
+
+		$sql = "
+
+		SELECT " . $fields . "
+		FROM ".$wpdb->prefix."lm_ecolabs_cf7_forms t1
+		LEFT JOIN ".$wpdb->prefix."lm_ecolabs_cf7_form_meta t2 ON t1.form_id = t2.form_meta_form_id
+		LEFT JOIN " . $wpdb->prefix . "posts t3 ON t1.form_post_id = t3.ID
+
+		WHERE t2.form_meta_id IS NOT NULL
+
+		" . $whereQ . "
+		" . $groupQ . "
+		" . $orderQ . "
+		" . $limitQ . "
+
+		";
+		// echo "<pre>";print_r($sql);echo "</pre>";die();
+		return $wpdb->get_results( $sql );
+	}
 }
