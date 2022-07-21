@@ -16,7 +16,7 @@
  * Plugin Name:       Lm ecolabs CF7
  * Plugin URI:        https://github.com/barriofranz/lm_ecolabs_cf7
  * Description:       Custom plugin for contact form 7 table. Requires "Contact Form 7" and "Contact Form lme_cf7"
- * Version:           1.0.0
+ * Version:           1.0.1
  * Author:            Franz Ian Barrio
  * Author URI:        https://github.com/barriofranz
  * License:           GPL-2.0+
